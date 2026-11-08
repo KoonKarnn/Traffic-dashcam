@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Dashcam Pro - AI OCR & Formal Legal Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- โหลดไลบรารี Tesseract.js สำหรับสแกนป้ายทะเบียนแบบออฟไลน์/เบราว์เซอร์ -->
+    <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between relative overflow-x-hidden">
+
+    <!-- 1. LEGAL DISCLAIMER & PDPA MODAL (ปกป้องผู้สร้างจากความรับผิดทางกฎหมาย) -->
+    <div id="consentModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-red-500/50 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center space-x-2 text-red-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h2 class="text-lg font-bold">เงื่อนไขทางกฎหมาย & การปฏิเสธความรับผิด</h2>
+            </div>
+            
+            <div class="text-xs text-slate-300 space-y-2 max-h-48 overflow-y-auto pr-2 bg-slate-900/60 p-3 rounded-xl border border-slate-700 leading-relaxed">
+                <p>⚠️ <strong>ประกาศสำคัญเพื่อปกป้องผู้พัฒนา:</strong> แอปพลิเคชันนี้พัฒนาขึ้นเพื่อเป็นเครื่องมือบันทึกพยานหลักฐานส่วนบุคคลเท่านั้น</p>
+                <p>• <strong>ผู้ใช้ต้องรับผิดชอบเอง 100%:</strong> ผู้ใช้งานตกลงว่าจะใช้แอปนี้ด้วยความสุจริต หากนำไปใช้กลั่นแกล้ง รีดไถ หรือแจ้งข้อมูลอันเป็นเท็จต่อเจ้าหน้าที่รัฐ <strong>ผู้ใช้งานจะต้องรับผิดชอบทางแพ่งและอาญาแต่เพียงผู้เดียว</strong> ผู้สร้าง/ผู้พัฒนาไม่มีส่วนเกี่ยวข้องทางกฎหมายใดๆ ทั้งสิ้น</p>
+                <p>• <strong>ความเป็นส่วนตัว (PDPA):</strong> ผู้ใช้ต้องรับผิดชอบในการเบลอภาพป้ายทะเบียนรถคันอื่นหรือใบหน้าบุคคลที่ไม่เกี่ยวข้องตามกฎหมายคุ้มครองข้อมูลส่วนบุคคลก่อนเผยแพร่</p>
+            </div>
+
+            <div class="pt-2 border-t border-slate-700 space-y-3">
+                <label class="flex items-start space-x-2 text-xs text-slate-300 cursor-pointer">
+                    <input type="checkbox" id="acceptCheck" checked class="mt-0.5 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0">
+                    <span>ข้าพเจ้ารับทราบ เข้าใจข้อจำกัด และยอมรับเงื่อนไขการใช้งานโดยขอรับผิดชอบแต่เพียงผู้เดียว</span>
+                </label>
+
+                <button onclick="acceptConsent()" id="startBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition shadow-lg cursor-pointer text-sm">
+                    ยอมรับและเริ่มใช้งาน
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. LOGIN MODAL (สิทธิ์การใช้งาน Free vs Owner) -->
+    <div id="loginModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <h3 class="font-bold text-blue-400 text-sm">🔐 เข้าสู่ระบบสมาชิก / เจ้าของระบบ</h3>
+                <button onclick="toggleLoginModal()" class="text-slate-400 hover:text-white text-xs">✕ ปิด</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="text-slate-400 block mb-1">อีเมลผู้ใช้งาน:</label>
+                    <input type="email" id="loginEmail" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" placeholder="user@email.com (พิมพ์ owner เพื่อจำลองสิทธิ์ผู้สร้าง)">
+                </div>
+                <button onclick="simulateLogin()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-bold rounded-lg text-white transition">
+                    เข้าสู่ระบบ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. AI VIOLATION REPORT MODAL + REAL OCR -->
+    <div id="reportModal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-blue-500/50 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h2 class="text-base font-bold text-blue-400 flex items-center space-x-2">
+                    <span>🤖 AI Report & Real OCR (สแกนป้ายทะเบียนจริง)</span>
+                </h2>
+                <button onclick="closeReportModal()" class="text-slate-400 hover:text-white text-xs px-2 py-1 bg-slate-700 rounded">✕ ปิด</button>
+            </div>
+
+            <div class="space-y-3 text-xs text-slate-300">
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700 space-y-1.5">
+                    <p class="font-bold text-emerald-400">📍 ข้อมูลพิกัดและเวลา:</p>
+                    <p id="repLocation" class="text-slate-200">ถนน: กำลังโหลด...</p>
+                    <p id="repCoords" class="text-slate-400 font-mono">Lat: --, Lng: --</p>
+                    <p id="repTime" class="text-slate-400">เวลา: --</p>
+                </div>
+
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700 space-y-1.5">
+                    <p class="font-bold text-amber-400">🔍 AI OCR สแกนป้ายทะเบียนอัตโนมัติ:</p>
+                    <div class="flex items-center space-x-2 pt-1">
+                        <input type="text" id="detectedPlate" class="w-full bg-black/50 border border-emerald-500/50 rounded-lg p-2 text-emerald-300 font-mono font-bold text-center text-sm" value="กำลังประมวลผล OCR...">
+                        <span id="ocrStatusBadge" class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-1 rounded border border-amber-500/30 whitespace-nowrap">กำลังสแกน...</span>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="font-bold text-slate-200 block">🚨 ระบุข้อหา/ฐานความผิด (ภาษาทางการตาม พ.ร.บ.จราจรทางบก):</label>
+                    <select id="violationTypeSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="ขับรถด้วยความเร็วเกินอัตรากำหนดที่กฎหมายกำหนด (มาตรา 67)">ขับรถด้วยความเร็วเกินอัตรากำหนดที่กฎหมายกำหนด (มาตรา 67)</option>
+                        <option value="ขับรถในลักษณะกีดขวางการจราจร หรือไม่ขับรถในช่องเดินรถด้านซ้ายสุด/ใกล้เคียง (ขับแช่ขวา) (มาตรา 34/35)">ขับรถในลักษณะกีดขวางการจราจร หรือไม่ขับรถในช่องเดินรถด้านซ้ายสุด/ใกล้เคียง (ขับแช่ขวา)</option>
+                        <option value="ไม่ขับรถชิดด้านซ้ายของทางเดินรถ หรือฝ่าฝืนเครื่องหมายจราจรบนผิวทาง (มาตรา 33)">ไม่ขับรถชิดด้านซ้ายของทางเดินรถ หรือฝ่าฝืนเครื่องหมายจราจรบนผิวทาง</option>
+                        <option value="รถบรรทุก/รถสาธารณะ ฝ่าฝืนข้อบังคับการเดินรถ หรือฝ่าฝืนช่องเดินรถประจำทาง/ช่องทางต้องห้าม">รถบรรทุก / รถสาธารณะ ฝ่าฝืนข้อบังคับการเดินรถ หรือขับในช่องเดินรถต้องห้าม</option>
+                        <option value="ขับรถโดยประมาทหรือน่าหวาดเสียวอันอาจเกิดอันตรายแก่บุคคลหรือทรัพย์สิน (มาตรา 43(3))">ขับรถโดยประมาทหรือน่าหวาดเสียวอันอาจเกิดอันตรายแก่บุคคลหรือทรัพย์สิน (มาตรา 43(3))</option>
+                        <option value="ฝ่าฝืนสัญญาณไฟจราจร (ไฟแดง) หรือเครื่องหมายจราจรที่ติดตั้งไว้ (มาตรา 22)">ฝ่าฝืนสัญญาณไฟจราจร (ไฟแดง) หรือเครื่องหมายจราจรที่ติดตั้งไว้ (มาตรา 22)</option>
+                        <option value="ขับรถแซงขึ้นหน้าในระยะกระชั้นชิด หรือแซงในที่คับขันอันตราย (มาตรา 44/45)">ขับรถแซงขึ้นหน้าในระยะกระชั้นชิด หรือแซงในที่คับขันอันตราย (มาตรา 44/45)</option>
+                    </select>
+                </div>
+
+                <div class="space-y-1 pt-1">
+                    <label class="font-bold text-blue-400 block">📋 ข้อความรายงาน (พร้อมส่งแจ้งเบาะแส):</label>
+                    <textarea id="finalReportText" rows="4" readonly class="w-full bg-black/60 border border-slate-700 rounded-xl p-2.5 font-mono text-[10px] text-emerald-300 focus:outline-none select-all"></textarea>
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-700 space-y-2">
+                <button onclick="copyReportText()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-bold rounded-xl text-white transition text-xs shadow-md">
+                    📋 คัดลอกข้อความรายงานทั้งหมด
+                </button>
+                <div class="grid grid-cols-2 gap-2">
+                    <a id="modalDownloadVideo" class="py-2 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white text-center transition text-xs block">
+                        📥 โหลดคลิป Burn-in
+                    </a>
+                    <a id="modalDownloadPhoto" class="py-2 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-xl text-white text-center transition text-xs block">
+                        📥 โหลดภาพนิ่ง
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. BLACK SCREEN MODE -->
+    <div id="blackScreenOverlay" onclick="toggleBlackScreen()" class="hidden fixed inset-0 bg-black z-40 flex flex-col items-center justify-center cursor-pointer select-none">
+        <div class="text-slate-600 text-center space-y-2 p-4">
+            <p id="blackScreenStatus" class="text-lg font-bold animate-pulse text-amber-500">🎙️ โหมดดับหน้าจอ (สแตนด์บายฟังเสียง)</p>
+            <p class="text-xs text-slate-400">พูด <span class="text-amber-400 font-bold">"เริ่มอัด"</span> หรือ <span class="text-amber-400 font-bold">"บันทึก"</span> เพื่อสั่งงาน</p>
+        </div>
+    </div>
+
+    <!-- 5. RIGHT SIDEBAR -->
+    <div id="guideSidebar" class="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-slate-800 border-l border-slate-700 z-50 transform translate-x-full transition-transform duration-300 ease-in-out shadow-2xl flex flex-col">
+        <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-850">
+            <h2 class="font-bold text-blue-400 text-base">📖 เมนู & ติดต่อโฆษณา</h2>
+            <button onclick="toggleGuideSidebar()" class="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-700/50 text-xs px-2.5 py-1">✕ ปิด</button>
+        </div>
+
+        <div class="p-4 overflow-y-auto flex-1 space-y-4 text-xs text-slate-300">
+            <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700 space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <span class="font-bold text-amber-400">👤 สถานะบัญชี:</span>
+                    <span id="userTierBadge" class="bg-blue-500/20 text-blue-300 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 font-bold">Free Tier</span>
+                </div>
+                <p id="userTierDesc" class="text-[11px] text-slate-400">จำกัดการสร้างรายงาน 3 ครั้ง/วัน</p>
+                <button onclick="toggleLoginModal(); toggleGuideSidebar();" class="w-full mt-1 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded font-semibold text-[11px] transition">
+                    🔑 เข้าสู่ระบบ / สลับสิทธิ์ (Owner)
+                </button>
+            </div>
+
+            <div class="bg-gradient-to-br from-indigo-950/60 to-purple-950/60 border border-purple-500/30 rounded-xl p-3 space-y-2">
+                <h3 class="font-bold text-purple-300 text-xs">💼 ติดต่อลงพื้นที่โฆษณา (Ads)</h3>
+                <p class="text-[11px] text-slate-300 leading-relaxed">สนใจลงแบนเนอร์หรือสปอนเซอร์ในแอป Dashcam ติดต่อ:</p>
+                <div class="bg-black/50 p-2 rounded-lg font-mono text-[10px] text-purple-200 space-y-1">
+                    <p>📧 Email: ads@trafficdashcam.pro</p>
+                    <p>💬 Line: @dashcam-ads</p>
+                </div>
+            </div>
+
+            <div class="bg-blue-950/40 border border-blue-500/30 rounded-xl p-3 space-y-2">
+                <h3 class="font-bold text-blue-300 text-xs">💡 คำสั่งเสียงด่วน</h3>
+                <p class="text-[11px] text-slate-300">• พูด <strong>"เริ่มอัด"</strong> เพื่อเริ่มบันทึกวนทับ</p>
+                <p class="text-[11px] text-slate-300">• พูด <strong>"บันทึก"</strong> เพื่อเซฟคลิปและเปิด AI Report</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. HEADER -->
+    <header class="bg-slate-800 border-b border-slate-700 p-3.5 flex justify-between items-center">
+        <h1 class="font-bold text-base text-blue-400">🚨 Traffic Dashcam Pro</h1>
+        <div class="flex items-center space-x-2">
+            <button onclick="toggleGuideSidebar()" class="bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 text-xs px-2.5 py-1 rounded-lg font-semibold transition">
+                📖 เมนู & โฆษณา
+            </button>
+            <div id="statusBadge" class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full border border-amber-500/30">สแตนด์บาย</div>
+        </div>
+    </header>
+
+    <!-- 7. MAIN VIEWPORT -->
+    <main class="flex-1 p-3 max-w-md mx-auto w-full flex flex-col justify-center space-y-3">
+        <div class="relative bg-black rounded-2xl overflow-hidden aspect-[9/16] border border-slate-700 flex flex-col justify-between p-3.5 shadow-xl">
+            <video id="webcam" autoplay playsinline muted class="hidden"></video>
+            <canvas id="dashcamCanvas" class="absolute inset-0 w-full h-full object-cover"></canvas>
+
+            <!-- Overlay Telemetry -->
+            <div class="relative z-10 flex justify-between items-start pointer-events-none">
+                <div class="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 space-y-0.5 text-[10px] text-slate-300">
+                    <p id="uiLocation" class="text-emerald-400 font-bold">📍 ค้นหา GPS...</p>
+                    <p id="uiCoords">Lat: --.----, Lng: --.----</p>
+                    <p id="uiTime">--/--/---- --:--:--</p>
+                </div>
+                
+                <div class="flex items-center space-x-1 bg-black/70 backdrop-blur-md p-1.5 rounded-xl border border-white/10">
+                    <div id="uiSpeedBox" class="bg-blue-950 border border-blue-500/40 px-2 py-0.5 rounded-lg text-center min-w-[70px]">
+                        <span id="uiSpeed" class="text-sm font-black font-mono text-blue-400">0</span>
+                        <span class="text-[7px] text-blue-300 block leading-none font-bold">ความเร็วรถผู้บันทึก</span>
+                    </div>
+                    <div class="bg-slate-900 border border-amber-500/50 px-2 py-0.5 rounded-lg text-center min-w-[45px]">
+                        <span id="uiLimit" class="text-sm font-black font-mono text-amber-400">90</span>
+                        <span class="text-[7px] text-amber-300 block leading-none font-bold">จำกัด</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Camera Controls -->
+            <div class="relative z-10 flex justify-between items-center">
+                <span id="voiceStatus" class="text-[9px] text-amber-300 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-amber-500/30">🎙️ พร้อมฟังเสียง</span>
+                <div class="flex space-x-1.5">
+                    <button onclick="toggleCamera()" class="p-1.5 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-lg text-white border border-white/10 text-xs">📷 สลับกล้อง</button>
+                    <button onclick="toggleBlackScreen()" class="p-1.5 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-lg text-amber-400 border border-white/10 text-xs">🌙 ดับหน้าจอ</button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="relative z-10 space-y-2">
+                <button id="toggleRecBtn" onclick="toggleRecordingManual()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white shadow-lg transition border border-white/10 text-xs flex flex-col items-center justify-center">
+                    <span>▶️ เริ่มอัดวิดีโอบันทึกวนทับ</span>
+                    <span class="text-[9px] text-emerald-200 font-normal">🗣️ พูด "เริ่มอัด" / "หยุดอัด"</span>
+                </button>
+
+                <button onclick="takeSnapshot()" class="w-full py-2 bg-blue-600/90 hover:bg-blue-500 font-bold rounded-xl text-white shadow-md transition border border-blue-400/30 text-xs flex flex-col items-center justify-center">
+                    <span>📸 ถ่ายภาพนิ่งป้ายทะเบียน + Telemetry</span>
+                    <span class="text-[9px] text-blue-200 font-normal">🗣️ พูด "ถ่ายรูป"</span>
+                </button>
+
+                <button onclick="saveEmergencyClip()" class="w-full py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 font-bold rounded-xl text-white shadow-xl transition border border-white/20 text-xs flex flex-col items-center justify-center">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="w-2 h-2 bg-white rounded-full animate-ping"></span>
+                        <span>🚨 บันทึกคลิปย้อนหลัง + AI Report & Real OCR</span>
+                    </div>
+                    <span class="text-[9px] text-amber-100 font-normal">🗣️ พูด "บันทึก"</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 8. AD SPACE BANNER -->
+        <div class="bg-gradient-to-r from-slate-800 via-slate-850 to-slate-800 border border-slate-700/80 rounded-xl p-2.5 text-center text-xs text-slate-400 shadow-md flex items-center justify-between px-4">
+            <span class="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-mono">AD SPACE</span>
+            <span class="text-[11px] text-slate-300 font-medium">✨ พื้นที่โฆษณาผู้สนับสนุน (ติดต่อลงโฆษณาคลิก)</span>
+            <span class="text-[10px] text-blue-400 underline cursor-pointer" onclick="toggleGuideSidebar()">ติดต่อ</span>
+        </div>
+    </main>
+
+    <footer class="text-center py-2 text-[11px] text-slate-500 border-t border-slate-800">
+        Traffic Violation Recorder App &copy; 2026 - AI OCR & Legal Protected Edition
+    </footer>
+
+    <!-- 9. SCRIPT LOGIC -->
+    <script>
+        const modal = document.getElementById('consentModal');
+        const loginModal = document.getElementById('loginModal');
+        const reportModal = document.getElementById('reportModal');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('dashcamCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const statusBadge = document.getElementById('statusBadge');
+        const uiLocation = document.getElementById('uiLocation');
+        const uiCoords = document.getElementById('uiCoords');
+        const uiTime = document.getElementById('uiTime');
+        const uiSpeed = document.getElementById('uiSpeed');
+        const uiLimit = document.getElementById('uiLimit');
+        const uiSpeedBox = document.getElementById('uiSpeedBox');
+        
+        const toggleRecBtn = document.getElementById('toggleRecBtn');
+        const blackScreenOverlay = document.getElementById('blackScreenOverlay');
+        const blackScreenStatus = document.getElementById('blackScreenStatus');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const guideSidebar = document.getElementById('guideSidebar');
+
+        const userTierBadge = document.getElementById('userTierBadge');
+        const userTierDesc = document.getElementById('userTierDesc');
+        const loginEmail = document.getElementById('loginEmail');
+        const detectedPlate = document.getElementById('detectedPlate');
+        const ocrStatusBadge = document.getElementById('ocrStatusBadge');
+
+        const repLocation = document.getElementById('repLocation');
+        const repCoords = document.getElementById('repCoords');
+        const repTime = document.getElementById('repTime');
+        const violationTypeSelect = document.getElementById('violationTypeSelect');
+        const finalReportText = document.getElementById('finalReportText');
+        const modalDownloadVideo = document.getElementById('modalDownloadVideo');
+        const modalDownloadPhoto = document.getElementById('modalDownloadPhoto');
+
+        let currentStream;
+        let useFacingMode = "environment";
+        let currentLat = 14.6190;
+        let currentLng = 100.9140;
+        let currentSpeedKMH = 0;
+        let currentRoadName = "กำลังค้นหาพิกัด...";
+        let legalSpeedLimit = 90;
+
+        let mediaRecorder;
+        let canvasStream;
+        let bufferChunks = [];
+        let isRecording = false;
+        let isOwner = false;
+
+        function acceptConsent() {
+            modal.style.display = 'none';
+            initCamera();
+            initTelemetryGPS();
+            initVoiceRecognition();
+            startRenderLoop();
+        }
+
+        function toggleGuideSidebar() { guideSidebar.classList.toggle('translate-x-full'); }
+        function toggleLoginModal() { loginModal.classList.toggle('hidden'); }
+        function closeReportModal() { reportModal.classList.add('hidden'); }
+        function toggleBlackScreen() { blackScreenOverlay.classList.toggle('hidden'); }
+
+        function simulateLogin() {
+            const email = loginEmail.value.trim().toLowerCase();
+            if (!email) { alert("กรุณากรอกอีเมล"); return; }
+            if (email.includes("owner") || email.includes("admin")) {
+                isOwner = true;
+                userTierBadge.innerText = "👑 OWNER (FULL ACCESS)";
+                userTierBadge.className = "bg-purple-500/20 text-purple-300 text-[10px] px-2 py-0.5 rounded border border-purple-500/30 font-bold";
+                userTierDesc.innerText = "คุณคือเจ้าของระบบ ปล็อกล็อกสิทธิ์และโฆษณา";
+                alert("👑 เข้าสู่ระบบ Owner สำเร็จ!");
+            } else {
+                isOwner = false;
+                userTierBadge.innerText = "👤 Free Tier";
+                userTierDesc.innerText = `เข้าสู่ระบบ (${email}) - จำกัดรายงาน`;
+                alert("✅ เข้าสู่ระบบสำเร็จ");
+            }
+            toggleLoginModal();
+        }
+
+        async function initCamera() {
+            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: useFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true 
+                });
+                video.srcObject = currentStream;
+                video.play();
+                statusBadge.className = "text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded-full border border-emerald-500/30";
+                statusBadge.innerText = "กล้องพร้อม";
+            } catch (err) {
+                statusBadge.className = "text-[10px] bg-red-500/20 text-red-300 px-2 py-1 rounded-full border border-red-500/30";
+                statusBadge.innerText = "ไม่พบกล้อง";
+            }
+        }
+
+        function startRenderLoop() {
+            function render() {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                        canvas.width = video.videoWidth || 720;
+                        canvas.height = video.videoHeight || 1280;
+                    }
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    const nowStr = new Date().toLocaleString('th-TH');
+                    const isOverSpeed = currentSpeedKMH > legalSpeedLimit;
+
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+                    ctx.fillRect(20, 20, canvas.width - 40, 110);
+                    ctx.strokeStyle = isOverSpeed ? "rgba(239, 68, 68, 0.8)" : "rgba(255, 255, 255, 0.2)";
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(20, 20, canvas.width - 40, 110);
+
+                    ctx.fillStyle = "#34d399";
+                    ctx.font = "bold 24px sans-serif";
+                    ctx.fillText(currentRoadName, 40, 60);
+
+                    ctx.fillStyle = "#cbd5e1";
+                    ctx.font = "20px monospace";
+                    ctx.fillText(`Lat: ${currentLat.toFixed(5)}, Lng: ${currentLng.toFixed(5)}`, 40, 90);
+                    ctx.fillText(nowStr, 40, 115);
+
+                    const speedBoxWidth = 240;
+                    const speedBoxX = canvas.width - speedBoxWidth - 40;
+                    
+                    ctx.fillStyle = isOverSpeed ? "rgba(185, 28, 28, 0.9)" : "rgba(30, 58, 138, 0.9)";
+                    ctx.fillRect(speedBoxX, 30, 135, 90);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 36px monospace";
+                    ctx.textAlign = "center";
+                    ctx.fillText(Math.round(currentSpeedKMH), speedBoxX + 67, 72);
+                    ctx.font = "bold 11px sans-serif";
+                    ctx.fillStyle = "#93c5fd";
+                    ctx.fillText("ความเร็วรถผู้บันทึก", speedBoxX + 67, 102);
+
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+                    ctx.fillRect(speedBoxX + 140, 30, 100, 90);
+                    ctx.fillStyle = "#fbbf24";
+                    ctx.font = "bold 36px monospace";
+                    ctx.fillText(legalSpeedLimit, speedBoxX + 190, 72);
+                    ctx.font = "bold 11px sans-serif";
+                    ctx.fillStyle = "#fcd34d";
+                    ctx.fillText("จำกัดไม่เกิน", speedBoxX + 190, 102);
+                    ctx.textAlign = "left";
+
+                    uiLocation.innerText = `📍 ${currentRoadName}`;
+                    uiCoords.innerText = `Lat: ${currentLat.toFixed(4)}, Lng: ${currentLng.toFixed(4)}`;
+                    uiTime.innerText = nowStr;
+                    uiSpeed.innerText = Math.round(currentSpeedKMH);
+                    uiLimit.innerText = legalSpeedLimit;
+                }
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        }
+
+        function initTelemetryGPS() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition((pos) => {
+                    currentLat = pos.coords.latitude;
+                    currentLng = pos.coords.longitude;
+                    currentSpeedKMH = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
+                    getRoadName(currentLat, currentLng);
+                }, () => {}, { enableHighAccuracy: true });
+            }
+        }
+
+        async function getRoadName(lat, lng) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`);
+                const data = await res.json();
+                if (data && data.address) {
+                    currentRoadName = data.address.road || data.address.suburb || "ถนนไม่ทราบชื่อ";
+                    legalSpeedLimit = data.address.highway === 'motorway' ? 120 : 90;
+                }
+            } catch (e) { currentRoadName = "พิกัด GPS ท้องถิ่น"; }
+        }
+
+        function startRingBuffer() {
+            if (isRecording) return;
+            try {
+                canvasStream = canvas.captureStream(30);
+                if (currentStream && currentStream.getAudioTracks().length > 0) {
+                    canvasStream.addTrack(currentStream.getAudioTracks()[0]);
+                }
+                mediaRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(canvas.captureStream(30));
+            }
+            bufferChunks = [];
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    bufferChunks.push(e.data);
+                    if (bufferChunks.length > 24) bufferChunks.shift();
+                }
+            };
+            mediaRecorder.start(5000);
+            isRecording = true;
+            toggleRecBtn.className = "w-full py-2.5 bg-red-600 hover:bg-red-500 font-bold rounded-xl text-white shadow-lg transition border border-white/10 text-xs flex flex-col items-center justify-center animate-pulse";
+            toggleRecBtn.innerHTML = `<span>⏹️ กำลังบันทึกวนทับ</span>`;
+            statusBadge.innerText = "กำลังอัด...";
+        }
+
+        function stopRingBuffer() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            isRecording = false;
+            toggleRecBtn.className = "w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white shadow-lg transition border border-white/10 text-xs flex flex-col items-center justify-center";
+            toggleRecBtn.innerHTML = `<span>▶️ เริ่มอัดวิดีโอบันทึกวนทับ</span>`;
+            statusBadge.innerText = "สแตนด์บาย";
+        }
+
+        function toggleRecordingManual() { if (isRecording) stopRingBuffer(); else startRingBuffer(); }
+        function takeSnapshot() { return canvas.toDataURL('image/jpeg', 0.95); }
+
+        async function openAIReportModal(videoUrl, photoUrl) {
+            const nowStr = new Date().toLocaleString('th-TH');
+            repLocation.innerText = `ถนน: ${currentRoadName}`;
+            repCoords.innerText = `Lat: ${currentLat.toFixed(5)}, Lng: ${currentLng.toFixed(5)}`;
+            repTime.innerText = `เวลา: ${nowStr}`;
+
+            modalDownloadVideo.href = videoUrl;
+            modalDownloadVideo.download = `dashcam-violation-${Date.now()}.webm`;
+            modalDownloadPhoto.href = photoUrl;
+            modalDownloadPhoto.download = `dashcam-snapshot-${Date.now()}.jpg`;
+
+            // เริ่มทำการสแกน OCR จากภาพนิ่งจริงด้วย Tesseract.js
+            detectedPlate.value = "กำลังประมวลผล OCR...";
+            ocrStatusBadge.innerText = "กำลังสแกน...";
+            ocrStatusBadge.className = "text-[10px] bg-amber-500/20 text-amber-300 px-2 py-1 rounded border border-amber-500/30 whitespace-nowrap animate-pulse";
+            
+            reportModal.classList.remove('hidden');
+
+            try {
+                // เรียกใช้ Tesseract สแกนข้อความจากภาพถ่าย
+                const result = await Tesseract.recognize(photoUrl, 'eng+tha', {
+                    logger: m => {}
+                });
+                let text = result.data.text.replace(/[\n\r]+/g, ' ').trim();
+                if (text.length > 2) {
+                    detectedPlate.value = text.substring(0, 20); // ดึงข้อความที่สแกนได้มาใส่ช่อง
+                    ocrStatusBadge.innerText = "OCR สำเร็จ";
+                    ocrStatusBadge.className = "text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded border border-emerald-500/30 whitespace-nowrap";
+                } else {
+                    detectedPlate.value = "ไม่พบป้ายทะเบียนชัดเจน (กรุณากรอกเพิ่ม)";
+                    ocrStatusBadge.innerText = "ไม่พบข้อความ";
+                    ocrStatusBadge.className = "text-[10px] bg-red-500/20 text-red-300 px-2 py-1 rounded border border-red-500/30 whitespace-nowrap";
+                }
+            } catch (err) {
+                detectedPlate.value = "ระบบ OCR ขัดข้อง (พิมพ์เองได้)";
+                ocrStatusBadge.innerText = "ผิดพลาด";
+                ocrStatusBadge.className = "text-[10px] bg-red-500/20 text-red-300 px-2 py-1 rounded border border-red-500/30 whitespace-nowrap";
+            }
+
+            updateReportTextBuilder();
+            violationTypeSelect.onchange = updateReportTextBuilder;
+            detectedPlate.oninput = updateReportTextBuilder;
+        }
+
+        function updateReportTextBuilder() {
+            const nowStr = new Date().toLocaleString('th-TH');
+            const vType = violationTypeSelect.value;
+            const plate = detectedPlate.value.trim();
+            const mySpeedInt = Math.round(currentSpeedKMH);
+
+            const reportString = `[รายงานแจ้งเบาะแสการกระทำความผิดจราจร]\n` +
+                `📅 วันเวลา: ${nowStr}\n` +
+                `📍 สถานที่: ${currentRoadName} (Lat: ${currentLat.toFixed(5)}, Lng: ${currentLng.toFixed(5)})\n` +
+                `🚗 ป้ายทะเบียนรถคู่กรณี: ${plate}\n` +
+                `⚖️ ฐานความผิด: ${vType}\n` +
+                `🏎️ ความเร็วรถผู้บันทึก: ${mySpeedInt} กม./ชม. (จำกัดไม่เกิน ${legalSpeedLimit})\n` +
+                `⚠️ หมายเหตุ: ผู้แจ้งขอรับผิดชอบต่อข้อมูลและพยานหลักฐานนี้ตามกฎหมาย`;
+
+            finalReportText.value = reportString;
+        }
+
+        function copyReportText() {
+            finalReportText.select();
+            navigator.clipboard.writeText(finalReportText.value);
+            alert("📋 คัดลอกข้อความรายงานเรียบร้อย!");
+        }
+
+        function saveEmergencyClip() {
+            if (!isRecording || bufferChunks.length === 0) {
+                alert("กรุณากด 'เริ่มอัด' ก่อนเพื่อให้ระบบเก็บบัฟเฟอร์วิดีโอย้อนหลังครับ");
+                return;
+            }
+            const blob = new Blob(bufferChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const photoUrl = takeSnapshot();
+            openAIReportModal(url, photoUrl);
+        }
+
+        function initVoiceRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'th-TH';
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.onresult = (event) => {
+                const cmd = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+                if (cmd.includes("เริ่มอัด")) { if (!isRecording) startRingBuffer(); }
+                else if (cmd.includes("หยุดอัด")) { if (isRecording) stopRingBuffer(); }
+                else if (cmd.includes("บันทึก")) { saveEmergencyClip(); }
+            };
+            recognition.onerror = () => { setTimeout(() => { try{recognition.start();}catch(e){} }, 2000); };
+            recognition.onend = () => { try{recognition.start();}catch(e){} };
+            try { recognition.start(); voiceStatus.innerText = "🎙️ พร้อมรับคำสั่งเสียง"; } catch (e) {}
+        }
+
+        function toggleCamera() {
+            useFacingMode = (useFacingMode === "environment") ? "user" : "environment";
+            initCamera();
+        }
+    </script>
+</body>
+</html>
